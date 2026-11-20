@@ -1,0 +1,7 @@
+/target/
+/.claudecode-panel/
+/.claude/
+/.env
+/.env.*
+/*.exe
+/*.pdb

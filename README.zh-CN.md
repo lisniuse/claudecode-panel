@@ -1,3 +1,5 @@
+<img src="assets/logo.svg" alt="Claude Code Panel 标识" width="96" height="96">
+
 # Claude Code Panel
 
 [English](README.md) · [下载](https://github.com/lisniuse/claudecode-panel/releases/latest)

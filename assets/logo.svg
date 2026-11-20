@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Claude Code Panel">
+  <defs>
+    <linearGradient id="frame" x2="0" y2="1">
+      <stop stop-color="#354257"/>
+      <stop offset="1" stop-color="#172133"/>
+    </linearGradient>
+    <linearGradient id="sidebar" x2="0" y2="1">
+      <stop stop-color="#FFD0A9"/>
+      <stop offset="1" stop-color="#ED9468"/>
+    </linearGradient>
+  </defs>
+  <rect x="5" y="5" width="118" height="118" rx="30" fill="url(#frame)" stroke="#8091A9" stroke-width="2"/>
+  <rect x="17" y="26" width="94" height="76" rx="15" fill="#101827"/>
+  <path d="M32 26h13v76H32a15 15 0 0 1-15-15V41a15 15 0 0 1 15-15Z" fill="url(#sidebar)"/>
+  <path d="m28 50 5 4-5 4" fill="none" stroke="#47281F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M29 68h6m-6 11h6" stroke="#643A30" stroke-width="4" stroke-linecap="round"/>
+  <path d="m60 48 15 15-15 15m23 0h13" fill="none" stroke="#FFF0DF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -11,3 +11,9 @@ cargo test --locked
 ```
 
 Keep changes focused and update both languages when changing visible text. Use temporary transcripts for tests that rename or delete session records.
+
+The build links the checked-in `assets/icons.res`. After editing `assets/logo.svg` or `assets/tray.svg`, regenerate it from a Visual Studio Developer PowerShell with CairoSVG and Pillow installed.
+
+```powershell
+python assets/build-icons.py
+```

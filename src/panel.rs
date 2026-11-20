@@ -18,11 +18,17 @@ use windows_sys::Win32::System::{
     LibraryLoader::{GetModuleHandleW, GetProcAddress},
     Threading::*,
 };
-use windows_sys::Win32::UI::{Controls::MARGINS, HiDpi::*, Shell::*, WindowsAndMessaging::*};
+use windows_sys::Win32::UI::{
+    Controls::{LIM_SMALL, LoadIconMetric, MARGINS},
+    HiDpi::*,
+    Shell::*,
+    WindowsAndMessaging::*,
+};
 use windows_sys::{s, w};
 
 const CLASS: *const u16 = w!("ClaudeCodePanelWindow");
 const TRAY_EVENT: u32 = WM_APP + 1;
+const TRAY_ICON_RESOURCE: *const u16 = 102 as *const u16;
 const OPEN_PANEL: u32 = WM_APP + 2;
 const TRAY_KEY_SELECT: u32 = NIN_SELECT + 1;
 const EDGE_DELAY: Duration = Duration::from_millis(160);
@@ -1263,16 +1269,34 @@ fn tray_icon(hwnd: HWND, operation: u32) {
         cbSize: size_of::<NOTIFYICONDATAW>() as u32,
         hWnd: hwnd,
         uID: 1,
-        uFlags: NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP,
+        uFlags: NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP,
         uCallbackMessage: TRAY_EVENT,
-        hIcon: unsafe { LoadIconW(null_mut(), IDI_APPLICATION) },
         ..NOTIFYICONDATAW::default()
     };
     for (target, value) in data.szTip.iter_mut().zip(app_title()) {
         *target = value;
     }
     unsafe {
-        if Shell_NotifyIconW(operation, &data) != 0 && operation == NIM_ADD {
+        let mut icon = null_mut();
+        if operation == NIM_ADD {
+            LoadIconMetric(
+                GetModuleHandleW(null()),
+                TRAY_ICON_RESOURCE,
+                LIM_SMALL,
+                &mut icon,
+            );
+            data.uFlags |= NIF_ICON;
+            data.hIcon = if icon.is_null() {
+                LoadIconW(null_mut(), IDI_APPLICATION)
+            } else {
+                icon
+            };
+        }
+        let notified = Shell_NotifyIconW(operation, &data);
+        if !icon.is_null() {
+            DestroyIcon(icon);
+        }
+        if notified != 0 && operation == NIM_ADD {
             data.Anonymous.uVersion = NOTIFYICON_VERSION_4;
             Shell_NotifyIconW(NIM_SETVERSION, &data);
         }

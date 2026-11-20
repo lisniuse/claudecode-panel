@@ -1,0 +1,23 @@
+name: Windows checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        run: rustup update stable --no-self-update
+      - name: Install Rust checks
+        run: rustup component add rustfmt clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Run tests that do not require an interactive console desktop
+        run: cargo test --locked -- --skip managed_console_owns_its_window_and_closes_only_its_job
+      - run: cargo build --release --locked

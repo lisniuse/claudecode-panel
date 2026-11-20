@@ -1,5 +1,6 @@
 use crate::controls::{Controls, SEARCH_ID};
 use crate::dialogs;
+use crate::folders;
 use crate::i18n::{self, Preference};
 use crate::paint;
 use crate::sessions::{self, Project, Session, Snapshot};
@@ -9,6 +10,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::ffi::c_void;
 use std::io;
+use std::path::Path;
 use std::ptr::{null, null_mut};
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::time::{Duration, Instant};
@@ -40,6 +42,9 @@ const FRAME_INTERVAL_MS: i32 = 5;
 const WINDOW_INSET: i32 = 14;
 const EDGE_WIDTH: i32 = 12;
 const TOOLTIP_DELAY: Duration = Duration::from_millis(380);
+const OPEN_EXPLORER: i32 = 3;
+const OPEN_VSCODE: i32 = 4;
+const OPEN_TERMINAL: i32 = 5;
 
 thread_local! {
     static STATE: RefCell<Option<Panel>> = const { RefCell::new(None) };
@@ -781,13 +786,9 @@ impl Panel {
             return;
         };
         let kind = self.rows[row].kind;
-        let items = match kind {
-            RowKind::Project(..) => [tr!("New session", "新建会话"), tr!("Delete", "删除")],
-            RowKind::Session(..) => [
-                tr!("Delete session", "删除会话"),
-                tr!("Rename session", "重命名会话"),
-            ],
-        };
+        let vscode = matches!(kind, RowKind::Project(..))
+            .then(folders::find_vscode)
+            .flatten();
         self.clear_path_tip();
         let choice = unsafe {
             ClientToScreen(self.hwnd, &mut point);
@@ -795,8 +796,37 @@ impl Panel {
             if menu.is_null() {
                 return;
             }
-            append_menu(menu, MF_STRING, 1, items[0]);
-            append_menu(menu, MF_STRING, 2, items[1]);
+            match kind {
+                RowKind::Project(..) => {
+                    append_menu(menu, MF_STRING, 1, tr!("New session", "新建会话"));
+                    append_menu(
+                        menu,
+                        MF_STRING,
+                        OPEN_EXPLORER as usize,
+                        tr!("Open in File Explorer", "在资源管理器中打开"),
+                    );
+                    if vscode.is_some() {
+                        append_menu(
+                            menu,
+                            MF_STRING,
+                            OPEN_VSCODE as usize,
+                            tr!("Open in VS Code", "在 VS Code 中打开"),
+                        );
+                    }
+                    append_menu(
+                        menu,
+                        MF_STRING,
+                        OPEN_TERMINAL as usize,
+                        tr!("Open in Terminal", "在此处打开终端"),
+                    );
+                    append_menu(menu, MF_SEPARATOR, 0, "");
+                    append_menu(menu, MF_STRING, 2, tr!("Delete", "删除"));
+                }
+                RowKind::Session(..) => {
+                    append_menu(menu, MF_STRING, 1, tr!("Delete session", "删除会话"));
+                    append_menu(menu, MF_STRING, 2, tr!("Rename session", "重命名会话"));
+                }
+            }
             SetForegroundWindow(self.hwnd);
             let choice = TrackPopupMenu(
                 menu,
@@ -812,16 +842,21 @@ impl Panel {
             choice
         };
         self.outside_since = None;
-        let result = self.run_row_action(kind, choice);
+        let result = self.run_row_action(kind, choice, vscode.as_deref());
         if let Err(message) = result {
             show_owned_error(self.hwnd, &message);
         }
         self.redraw();
     }
 
-    fn run_row_action(&mut self, kind: RowKind, choice: i32) -> Result<(), String> {
+    fn run_row_action(
+        &mut self,
+        kind: RowKind,
+        choice: i32,
+        vscode: Option<&Path>,
+    ) -> Result<(), String> {
         match (kind, choice) {
-            (RowKind::Project(project, _), 1) => {
+            (RowKind::Project(project, _), 1 | OPEN_EXPLORER | OPEN_VSCODE | OPEN_TERMINAL) => {
                 let project = &self.snapshot.projects[project];
                 let cwd = project
                     .sessions
@@ -831,7 +866,41 @@ impl Panel {
                         "Could not find the working directory for this folder.",
                         "找不到该文件夹的工作目录。"
                     ))?;
-                terminal::launch(cwd, &[])?;
+                if choice != 1 && !cwd.is_dir() {
+                    return Err(trf!(
+                        "Could not find the original working directory: {}",
+                        "找不到原工作目录：{}",
+                        cwd.display()
+                    ));
+                }
+                match choice {
+                    1 => terminal::launch(cwd, &[])?,
+                    OPEN_EXPLORER => {
+                        folders::open_in_explorer(self.hwnd, cwd).map_err(|error| {
+                            trf!(
+                                "Could not open File Explorer: {error}",
+                                "无法打开资源管理器：{error}"
+                            )
+                        })?
+                    }
+                    OPEN_VSCODE => {
+                        let code =
+                            vscode.ok_or(tr!("VS Code was not found.", "找不到 VS Code。"))?;
+                        folders::open_in_vscode(code, cwd).map_err(|error| {
+                            trf!(
+                                "Could not open VS Code: {error}",
+                                "无法打开 VS Code：{error}"
+                            )
+                        })?;
+                    }
+                    OPEN_TERMINAL => terminal::open_shell(cwd).map_err(|error| {
+                        trf!(
+                            "Could not open a terminal: {error}",
+                            "无法打开终端：{error}"
+                        )
+                    })?,
+                    _ => unreachable!(),
+                }
                 self.close();
             }
             (RowKind::Project(project, _), 2) => {

@@ -44,6 +44,28 @@ pub(crate) fn launch(cwd: &Path, args: &[&str]) -> Result<(), String> {
     Ok(())
 }
 
+pub(crate) fn open_shell(cwd: &Path) -> io::Result<()> {
+    if let Some(terminal) = windows_terminal()
+        && !contains_separator(cwd.as_os_str())
+        && Command::new(terminal)
+            .args(["--window", "new", "new-tab", "--startingDirectory"])
+            .arg(cwd)
+            .current_dir(cwd)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .is_ok()
+    {
+        return Ok(());
+    }
+
+    Command::new(system_directory()?.join(r"WindowsPowerShell\v1.0\powershell.exe"))
+        .arg("-NoLogo")
+        .current_dir(cwd)
+        .creation_flags(CREATE_NEW_CONSOLE)
+        .spawn()?;
+    Ok(())
+}
+
 fn resolve_cli(cwd: &Path) -> Result<PathBuf, String> {
     if !cwd.is_dir() {
         return Err(trf!(

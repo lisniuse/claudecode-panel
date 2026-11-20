@@ -4,6 +4,7 @@
 mod i18n;
 mod controls;
 mod dialogs;
+mod folders;
 mod paint;
 mod panel;
 mod sessions;

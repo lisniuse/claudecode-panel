@@ -17,6 +17,7 @@ The left-edge trigger pauses when a fullscreen or borderless fullscreen applicat
 ### Session actions
 
 - Right-click a folder to start a Claude Code session in its working directory or delete its local session records. Deleting a folder from the panel preserves the project directory and project files.
+- The folder menu can also open its working directory in File Explorer, a terminal, or VS Code when detected.
 - Right-click a session to rename or delete it. Deletion asks for confirmation and uses the Windows Recycle Bin when supported.
 - The toolbar toggles compact layout, startup on sign-in, and Agent mode. Agent mode keeps the sidebar open and opens sessions with a single click. With Windows Terminal installed, it reuses a dedicated window to the right of the sidebar and only ends the previous tab started by the panel.
 - Use **Language** in the tray menu to select English, Simplified Chinese, or the Windows language.

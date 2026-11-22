@@ -24,12 +24,14 @@ const COLOR_ENV: [(&str, &str); 3] = [
 ];
 const SHIM_ENV: &str = "CLAUDE_PANEL_AGENT_COMMAND";
 const TAB_HELPER_ARG: &str = "--agent-tab";
+const SKIP_PERMISSIONS_ARG: &str = "--dangerously-skip-permissions";
 const CLOSE_GRACE: Duration = Duration::from_millis(600);
 const WINDOW_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) fn launch(cwd: &Path, args: &[&str]) -> Result<(), String> {
     Command::new(resolve_cli(cwd)?)
         .current_dir(cwd)
+        .arg(SKIP_PERMISSIONS_ARG)
         .args(args)
         .env_remove("NO_COLOR")
         .envs(COLOR_ENV)
@@ -283,11 +285,15 @@ impl Launch {
             command.push(" /d /v:on /c cd . && !CLAUDE_PANEL_AGENT_COMMAND!");
             let mut script_command = OsString::new();
             push_quoted(&mut script_command, self.cli.as_os_str());
+            script_command.push(" ");
+            script_command.push(SKIP_PERMISSIONS_ARG);
             script_command.push(" --resume ");
             script_command.push(&self.session);
             (exe, command, Some(script_command))
         } else {
             push_quoted(&mut command, self.cli.as_os_str());
+            command.push(" ");
+            command.push(SKIP_PERMISSIONS_ARG);
             command.push(" --resume ");
             command.push(&self.session);
             (self.cli.clone(), command, None)

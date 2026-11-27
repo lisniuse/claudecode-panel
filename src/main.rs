@@ -18,7 +18,11 @@ fn main() {
     }
     let result = settings::load().and_then(|preferences| {
         i18n::select(preferences.language);
-        panel::run(preferences)
+        if panel::run(preferences)? {
+            // The old panel has removed its tray icon and released the singleton.
+            std::process::Command::new(std::env::current_exe()?).spawn()?;
+        }
+        Ok(())
     });
     if let Err(error) = result {
         panel::show_error(&trf!(

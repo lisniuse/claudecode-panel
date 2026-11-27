@@ -45,6 +45,7 @@ const TOOLTIP_DELAY: Duration = Duration::from_millis(380);
 const OPEN_EXPLORER: i32 = 3;
 const OPEN_VSCODE: i32 = 4;
 const OPEN_TERMINAL: i32 = 5;
+const TRAY_RESTART: i32 = 8;
 
 thread_local! {
     static STATE: RefCell<Option<Panel>> = const { RefCell::new(None) };
@@ -75,6 +76,7 @@ pub(crate) struct Row {
 
 pub(crate) struct Panel {
     hwnd: HWND,
+    restart_requested: bool,
     controls: Controls,
     updates: Receiver<Snapshot>,
     refresh: SyncSender<()>,
@@ -124,6 +126,7 @@ impl Panel {
         let (updates, refresh) = sessions::watch();
         Self {
             hwnd,
+            restart_requested: false,
             controls,
             updates,
             refresh,
@@ -1020,6 +1023,12 @@ impl Panel {
                 );
             }
             AppendMenuW(menu, MF_SEPARATOR, 0, null());
+            append_menu(
+                menu,
+                MF_STRING,
+                TRAY_RESTART as usize,
+                tr!("Restart", "重新启动"),
+            );
             append_menu(menu, MF_STRING, 2, tr!("Exit", "退出"));
             SetForegroundWindow(self.hwnd);
             let choice = TrackPopupMenu(
@@ -1036,8 +1045,10 @@ impl Panel {
             match choice {
                 1 if self.opening => self.close(),
                 1 => self.open_from_tray(),
-                2 => {
-                    PostMessageW(self.hwnd, WM_CLOSE, 0, 0);
+                2 | TRAY_RESTART => {
+                    if PostMessageW(self.hwnd, WM_CLOSE, 0, 0) != 0 {
+                        self.restart_requested = choice == TRAY_RESTART;
+                    }
                 }
                 3 => self.toggle_preference(ToolbarButton::Compact),
                 4 => self.toggle_preference(ToolbarButton::Startup),
@@ -1454,7 +1465,7 @@ unsafe extern "system" fn window_proc(
     }
 }
 
-pub fn run(preferences: Preferences) -> io::Result<()> {
+pub fn run(preferences: Preferences) -> io::Result<bool> {
     unsafe {
         let mutex = CreateMutexW(null(), 0, w!("Local\\ClaudeCodePanel.Singleton"));
         let mutex_status = GetLastError();
@@ -1472,7 +1483,7 @@ pub fn run(preferences: Preferences) -> io::Result<()> {
                 }
             }
             CloseHandle(mutex);
-            return Ok(());
+            return Ok(false);
         }
         let result = message_loop(preferences);
         CloseHandle(mutex);
@@ -1480,7 +1491,7 @@ pub fn run(preferences: Preferences) -> io::Result<()> {
     }
 }
 
-unsafe fn message_loop(preferences: Preferences) -> io::Result<()> {
+unsafe fn message_loop(preferences: Preferences) -> io::Result<bool> {
     unsafe {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         let instance = GetModuleHandleW(null());
@@ -1537,11 +1548,13 @@ unsafe fn message_loop(preferences: Preferences) -> io::Result<()> {
         } else {
             pump_messages(hwnd, timer)
         };
-        STATE.with(|state| state.replace(None));
+        let restart = STATE
+            .with(|state| state.replace(None))
+            .is_some_and(|panel| panel.restart_requested);
         if !timer.is_null() {
             CloseHandle(timer);
         }
-        result
+        result.map(|()| restart)
     }
 }
 
